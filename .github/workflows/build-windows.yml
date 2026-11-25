@@ -1,6 +1,6 @@
 name: Build Windows installer
 
-on:
+'on':
   workflow_dispatch:
   release:
     types: [published]
@@ -27,7 +27,7 @@ jobs:
 
       - name: Build standalone Windows application
         shell: pwsh
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name TaikoNautsZipSync --collect-all pystray --collect-all PIL --hidden-import pystray._win32 taiko_zip_sync.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name TaikoNautsZipSync --icon assets/taikonauts_sync.ico --add-data "assets/taikonauts_sync.ico;assets" --collect-all pystray --collect-all PIL --hidden-import pystray._win32 taiko_zip_sync.py
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
