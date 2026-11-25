@@ -7,6 +7,7 @@ AppId={{30AC8183-13D8-4B3E-91E4-E4136C2E22AD}}
 AppName=TaikoNauts ZIP Sync
 AppVersion={#AppVersion}
 AppPublisher=Torld-Taiko-potato
+SetupIconFile=assets\taikonauts_sync.ico
 DefaultDirName={localappdata}\Programs\TaikoNauts ZIP Sync
 DefaultGroupName=TaikoNauts ZIP Sync
 PrivilegesRequired=lowest
