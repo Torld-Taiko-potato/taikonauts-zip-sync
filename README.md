@@ -1,37 +1,60 @@
-# TaikoNauts ZIP Sync — 配布用プロジェクト
+# TaikoNauts ZIP Sync
 
-このリポジトリはアプリ本体とWindowsインストーラーを配布するためのものです。譜面ZIPは、既存の `Torld-Taiko-potato/taiko-charts` リポジトリから取得します。アプリの初期値はその公開リポジトリと `charts` フォルダに設定済みです。
+TaikoNauts用の譜面を、共有リポジトリからダウンロードして譜面フォルダへ展開するWindowsアプリです。新しい譜面が追加されたら、起動中のアプリが定期確認して同期します。
 
-## 配布するもの
+## ダウンロードとインストール
 
-- `taiko_zip_sync.py`: アプリ本体
-- `.github/workflows/build-windows.yml`: GitHub ActionsでWindows版をビルドする設定
-- `installer.iss`: Inno Setupのインストーラー定義
-- `requirements.txt`: Pythonビルド依存パッケージ
+1. このリポジトリの **Releases** を開き、最新リリースを選びます。
 
-利用者はPythonやライブラリを入れず、GitHub Releasesから `TaikoNautsZipSync-Setup.exe` をダウンロードしてインストールします。
+1. 添付されている `TaikoNautsZipSync-Setup.exe` をダウンロードして実行します。
 
-## アプリ用リポジトリを作る
+1. 画面の案内に従ってインストールします。Pythonや追加ライブラリは不要です。
 
-譜面リポジトリとは分けて、GitHubに新しい**Public**リポジトリを作成します。例: `taikonauts-zip-sync`。
+1. インストール完了後にアプリを起動します。
 
-このフォルダ内のファイルを、フォルダ階層を保ったまま新しいリポジトリへアップロードしてコミットしてください。`.github/workflows/build-windows.yml` は必ず `.github/workflows/` の中に置きます。GitHubのファイルアップロード画面は隠しフォルダ `.github` を表示しないことがあるため、アップロード時に見えない場合は、まずGitHubで `.github/workflows/build-windows.yml` を手作業で作成し、残りのファイルをアップロードします。
+コード署名のないアプリのため、Windows SmartScreenが警告する場合があります。必ずこのリポジトリのReleaseから取得したファイルであることを確認してください。
 
-## Releaseを作ってインストーラーを生成する
+## 初回設定
 
-1. アプリ用リポジトリの **Releases → Draft a new release** を開きます。
-2. **Choose a tag** に `v1.0.0` と入力し、新しいタグとして作成します。Targetは `main` にします。
-3. Release titleに `TaikoNauts ZIP Sync v1.0.0` と入力します。
-4. **Publish release** を押します。
-5. リポジトリの **Actions** タブで **Build Windows installer** が動いていることを確認します。初回はInno Setupのインストールに数分かかる場合があります。
-6. 完了後、Releaseページに戻ると `TaikoNautsZipSync-Setup.exe` が添付されています。利用者にはそのReleaseページを案内します。
+1. **TaikoNautsの譜面保存先**の「参照...」から、TaikoNautsが読み込む譜面フォルダを選びます。
 
-GitHub Actionsはタグ・ReleaseごとにWindows上でアプリをビルドします。手元のWindows PCにPythonを入れなくてもインストーラーを生成できます。動作確認だけしたい場合は **Actions → Build Windows installer → Run workflow** を実行し、完了後にActionsのArtifactから試験用インストーラーをダウンロードできます。
+1. GitHubユーザー・リポジトリ・ブランチ・ZIPフォルダは共有譜面用に初期設定されています。通常は変更不要です。
 
-## リリース後の更新
+1. **今すぐ同期**を押します。`category.def`、カテゴリーの `box.def`、譜面ZIPが保存先へ反映されます。
 
-アプリのコードや設定を変更したらリポジトリへコミットし、`v1.0.1` など新しいタグでReleaseを作成します。Release公開をきっかけに新しいWindowsインストーラーがビルドされ、そのReleaseへアップロードされます。譜面データの追加・更新は、これまで通り `taiko-charts` リポジトリへZIPや定義ファイルをアップロードするだけです。
+1. 問題なく同期できたら、**Windows起動時に自動起動（タスクトレイ常駐・自動同期）**にチェックします。
 
-## 注意
+共有譜面リポジトリはPublicなので、GitHubトークンの入力は不要です。
 
-このアプリは公開譜面リポジトリからデータを取得するため、初回設定にGitHubトークンは不要です。譜面・音源の再配布可否は、配布する人が権利や利用条件を確認してください。Windows SmartScreenが初回に警告する場合があります。コード署名証明書を使っていないためで、警告が出たときは発行元・ダウンロード元を確認した上で利用してください。
+## 使い方
+
+アプリを起動している間、設定した間隔で共有リポジトリを確認します。ウィンドウ右上の **×** は終了ではなく、タスクトレイへ隠す操作です。トレイの太鼓アイコンを右クリックすると、ウィンドウ表示・今すぐ同期・終了を選べます。同期を止めるときはトレイメニューの **終了** を選んでください。
+
+PCの電源が切れている間は同期しません。次回起動時に自動起動が有効なら、起動後に確認します。
+
+## 譜面フォルダの構成
+
+共有リポジトリ内の `charts` フォルダをTaikoNautsの譜面フォルダへ同期します。各ZIPには一曲分の `.tja` と対応する音源を入れ、ZIP内のルートにファイルを置きます。ZIP名が曲フォルダ名になります。
+
+```
+charts/
+├── category.def
+├── 01.Pops/
+│   ├── box.def
+│   └── 曲A.zip
+└── 02.Kids/
+    ├── box.def
+    └── 曲B.zip
+```
+
+この例では `category.def` が譜面フォルダ直下へ、カテゴリーごとの `box.def` が各カテゴリー直下へ置かれます。曲ZIPは `01.Pops/曲A/` や `02.Kids/曲B/` に展開されます。
+
+同じパス・同じ名前のZIPが更新された場合、対応する曲フォルダをZIPの内容で置き換えます。古い版にしかないファイルは残りません。ZIPをリポジトリから削除しても、プレイヤー側の譜面は自動削除されません。
+
+## 困ったとき
+
+同期に失敗した場合は、アプリの **ログファイルを開く** を押してください。ログは `%USERPROFILE%\TaikoNautsZipSync.log` にあります。ZIP内に同じファイル名（Windowsで大文字・小文字の違いだけの名前を含む）が重複している場合、そのZIPは展開されず、エラーがログに記録されます。
+
+## 譜面・音源について
+
+このアプリは共有リポジトリの内容を配布します。アップロードする人は、譜面・音源を共有・再配布してよいか各自で確認してください。
