@@ -32,6 +32,11 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 
+def resource_path(relative_path):
+    bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return bundle_root / relative_path
+
+
 def github_request(url, token):
     headers = {
         "Accept": "application/vnd.github+json",
@@ -73,6 +78,12 @@ class SyncApp:
     def __init__(self, root, start_minimized=False):
         self.root = root
         root.title(APP_NAME)
+        icon_file = resource_path("assets/taikonauts_sync.ico")
+        if icon_file.exists():
+            try:
+                root.iconbitmap(str(icon_file))
+            except tk.TclError:
+                logger.warning("ウィンドウアイコンを設定できませんでした: %s", icon_file)
         root.geometry("760x580")
         root.minsize(660, 500)
         self.events = queue.Queue()
@@ -385,10 +396,14 @@ class SyncApp:
         if pystray is None:
             self.events.put(("error", "タスクトレイ機能には pystray と Pillow が必要です。手順書のインストール方法を実行してください。"))
             return
-        image = Image.new("RGB", (64, 64), (24, 42, 66))
-        draw = ImageDraw.Draw(image)
-        draw.ellipse((8, 8, 56, 56), fill=(248, 179, 54))
-        draw.text((20, 18), "T", fill=(24, 42, 66))
+        icon_file = resource_path("assets/taikonauts_sync.ico")
+        if icon_file.exists():
+            image = Image.open(icon_file).convert("RGBA")
+        else:
+            image = Image.new("RGB", (64, 64), (24, 42, 66))
+            draw = ImageDraw.Draw(image)
+            draw.ellipse((8, 8, 56, 56), fill=(248, 179, 54))
+            draw.text((20, 18), "T", fill=(24, 42, 66))
         menu = pystray.Menu(
             pystray.MenuItem("ウィンドウを表示", lambda icon, item: self.root.after(0, self.show_window), default=True),
             pystray.MenuItem("今すぐ同期", lambda icon, item: self.root.after(0, self.sync_once)),
