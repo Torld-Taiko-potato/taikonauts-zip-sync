@@ -9,6 +9,7 @@
 必要な主なファイルは次のとおりです。
 
 - `taiko_zip_sync.py`: アプリ本体
+- `app_version.py`: ソース実行時の既定バージョン。GitHub ActionsはReleaseタグからビルド時の値を設定
 - `.github/workflows/build-windows.yml`: GitHub ActionsでWindows版をビルドする設定
 - `installer.iss`: Inno Setupのインストーラー定義
 - `requirements.txt`: Pythonビルド依存パッケージ
@@ -16,13 +17,13 @@
 - `assets/taikonauts_sync.ico`: EXE、インストーラー、タスクトレイで共用するWindowsアイコン
 - `assets/taikonauts_sync.png`: READMEに表示するアイコン画像の高解像度版
 
-Windows通知は `winotify` を使います。通知内容は譜面リポジトリの `charts/announcement.json` に置かれ、利用者アプリが同期確認時に新しいIDを検出したときだけ表示します。お知らせの作成・公開は別配布の管理者用ツールで行います。
+Windows通知は `winotify` を使います。通知内容は譜面リポジトリの `charts/announcement.json` に置かれ、利用者アプリが同期確認時に新しいIDを検出したときだけ表示します。お知らせの作成・公開は別配布の管理者用ツールで行います。アプリ更新は起動時にこのリポジトリのLatest Releaseを確認し、利用者の承認後にインストーラーをダウンロード・起動します。GitHub ReleaseにSHA-256がある場合は、ダウンロード後に照合します。Inno Setupでは `CloseApplications=yes`、`RestartApplications=no` を指定し、更新時に実行中アプリが更新ファイルをロックしないようにします。
 
 ## アプリ用リポジトリを作る
 
 譜面リポジトリとは分けて、GitHubにPublicリポジトリを作ります。例: `taikonauts-zip-sync`。
 
-プロジェクトのファイルをフォルダ階層を保ったままアップロードしてコミットします。ワークフローは必ず `.github/workflows/build-windows.yml` に置きます。`.github` がWebアップロード画面に表示されない場合は、GitHubの **Add file → Create new file** からファイル名に `.github/workflows/build-windows.yml` と入力し、ファイル内容を貼り付けてください。
+プロジェクトのファイルをフォルダ階層を保ったままアップロードしてコミットします。`app_version.py` も含めてください。ワークフローは必ず `.github/workflows/build-windows.yml` に置きます。`.github` がWebアップロード画面に表示されない場合は、GitHubの **Add file → Create new file** からファイル名に `.github/workflows/build-windows.yml` と入力し、ファイル内容を貼り付けてください。
 
 ## Releaseからインストーラーを生成
 
@@ -40,7 +41,9 @@ GitHub ActionsはGitHubのWindowsランナー上でビルドします。開発�
 
 ## アプリの更新
 
-アプリのコードや設定を変更したらmainへコミットし、`v1.0.1` などの新しいタグでReleaseを作成します。Release公開をきっかけに、新しいWindowsインストーラーがビルドされ、そのReleaseへアップロードされます。譜面データの追加・更新は、これまで通り譜面リポジトリへZIPや定義ファイルを追加・更新します。
+アプリのコードや設定を変更したらmainへコミットし、`v1.0.2` などの新しいタグでReleaseを作成します。ワークフローはタグからアプリのバージョンを設定してビルドし、インストーラーをReleaseへアップロードします。利用者アプリは起動時にLatest Releaseを確認し、更新があれば利用者の承認後にインストーラーを起動します。
+
+自動更新機能が入る前の旧版（v1.0.1以前）には自身を更新する機能がないため、この機能を含む最初のReleaseだけは利用者がReleaseページから手動でインストールする必要があります。その次の更新からアプリ内で確認・更新できます。譜面データの追加・更新は、これまで通り譜面リポジトリへZIPや定義ファイルを追加・更新します。
 
 ## 注意事項
 

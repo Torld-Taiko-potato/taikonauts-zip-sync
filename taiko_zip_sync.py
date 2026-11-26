@@ -1,10 +1,13 @@
 import json
+import hashlib
 import logging
 from logging.handlers import RotatingFileHandler
 import os
 import queue
+import re
 import shutil
 import sys
+import subprocess
 import threading
 import time
 import urllib.error
@@ -27,6 +30,12 @@ except ImportError:
 
 APP_NAME = "TaikoNauts ZIP Sync"
 API_ROOT = "https://api.github.com"
+UPDATE_REPO = "Torld-Taiko-potato/taikonauts-zip-sync"
+INSTALLER_ASSET = "TaikoNautsZipSync-Setup.exe"
+try:
+    from app_version import APP_VERSION
+except ImportError:
+    APP_VERSION = "1.0.1"
 LOG_PATH = Path.home() / "TaikoNautsZipSync.log"
 logger = logging.getLogger("taiko_zip_sync")
 logger.setLevel(logging.INFO)
@@ -52,6 +61,64 @@ def github_request(url, token):
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=45) as response:
         return response.read(), response.headers.get("Content-Type", "")
+
+
+def version_key(value):
+    match = re.match(r"^v?(\d+(?:\.\d+)*)", str(value).strip(), re.IGNORECASE)
+    if not match:
+        raise ValueError(f"バージョン番号を読み取れません: {value}")
+    parts = [int(part) for part in match.group(1).split(".")]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts)
+
+
+def fetch_latest_release():
+    url = f"{API_ROOT}/repos/{UPDATE_REPO}/releases/latest"
+    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "TaikoNauts-ZIP-Sync/1.0"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        release = json.loads(response.read().decode("utf-8"))
+    asset = next((item for item in release.get("assets", []) if item.get("name") == INSTALLER_ASSET), None)
+    if not asset or not asset.get("browser_download_url"):
+        raise RuntimeError(f"最新Releaseに {INSTALLER_ASSET} が見つかりません。")
+    return release, asset
+
+
+def download_installer(asset, tag_name):
+    url = asset["browser_download_url"]
+    expected_prefix = f"https://github.com/{UPDATE_REPO}/releases/download/"
+    if not url.startswith(expected_prefix):
+        raise ValueError("インストーラーのダウンロード先が公式Release URLではありません。")
+    expected_digest = asset.get("digest") or ""
+    if not expected_digest.startswith("sha256:"):
+        raise ValueError("GitHub ReleaseにSHA-256情報がないため、安全のため更新を中止しました。")
+    downloads = Path.home() / "Downloads"
+    downloads.mkdir(parents=True, exist_ok=True)
+    safe_tag = re.sub(r"[^A-Za-z0-9._-]", "_", tag_name)
+    target = downloads / f"TaikoNautsZipSync-Setup-{safe_tag}.exe"
+    temporary = target.with_suffix(target.suffix + ".download")
+    request = urllib.request.Request(url, headers={"User-Agent": "TaikoNauts-ZIP-Sync/1.0"})
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response, temporary.open("wb") as out:
+            while True:
+                block = response.read(1024 * 1024)
+                if not block:
+                    break
+                total += len(block)
+                if total > 250 * 1024 * 1024:
+                    raise ValueError("ダウンロードが上限サイズ（250 MiB）を超えました。")
+                digest.update(block)
+                out.write(block)
+        if digest.hexdigest().lower() != expected_digest[7:].lower():
+            raise ValueError("ダウンロードしたインストーラーのSHA-256がGitHubの値と一致しません。")
+        if total == 0:
+            raise ValueError("ダウンロードしたインストーラーが空です。")
+        temporary.replace(target)
+        return target
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def safe_extract(zip_path, destination):
@@ -93,6 +160,7 @@ class SyncApp:
         self.events = queue.Queue()
         self.stop_event = threading.Event()
         self.worker = None
+        self.update_check_thread = None
         self.config_path = Path.home() / ".taiko_zip_sync.json"
         self.state_path = Path.home() / ".taiko_zip_sync_state.json"
         self.config = self.load_config()
@@ -114,6 +182,7 @@ class SyncApp:
             root.withdraw()
         if self.autostart.get():
             self.root.after(900, self.start_periodic)
+        self.root.after(2500, lambda: self.check_for_updates(manual=False))
 
     def load_config(self):
         try:
@@ -159,6 +228,8 @@ class SyncApp:
         self.start_button.pack(side="left", padx=8)
         self.stop_button = ttk.Button(buttons, text="停止", command=self.stop_periodic, state="disabled")
         self.stop_button.pack(side="left")
+        self.update_button = ttk.Button(buttons, text="アプリの更新を確認", command=lambda: self.check_for_updates(manual=True))
+        self.update_button.pack(side="left", padx=8)
         ttk.Button(buttons, text="ログファイルを開く", command=self.open_log_file).pack(side="left", padx=8)
         ttk.Checkbutton(main, text="Windows起動時に自動起動（タスクトレイ常駐・自動同期）", variable=self.autostart, command=self.toggle_autostart).pack(anchor="w", pady=(4, 2))
         ttk.Label(main, textvariable=self.status, wraplength=700).pack(anchor="w", pady=(2, 8))
@@ -401,6 +472,31 @@ class SyncApp:
                 elif kind == "notice":
                     notice = json.loads(text)
                     self.show_notice(notice["title"], notice["message"])
+                elif kind == "update_check_done":
+                    self.update_button.configure(state="normal")
+                    result = json.loads(text)
+                    if result["available"]:
+                        self.offer_update(result)
+                    elif result["manual"]:
+                        messagebox.showinfo("更新確認", f"このアプリは最新です（v{APP_VERSION}）。")
+                elif kind == "update_error":
+                    self.update_button.configure(state="normal")
+                    detail = text
+                    logger.warning("アップデート確認失敗: %s", detail)
+                    if "manual" in detail:
+                        detail = detail.replace("manual:", "", 1)
+                        messagebox.showerror("更新を確認できません", detail)
+                elif kind == "update_downloaded":
+                    installer_path = Path(text)
+                    try:
+                        subprocess.Popen([str(installer_path)])
+                        self.root.after(500, self.close)
+                    except Exception as exc:
+                        logger.exception("アップデーター起動失敗")
+                        messagebox.showerror("インストーラーを起動できません", f"{exc}\n\n{installer_path}")
+                elif kind == "update_download_error":
+                    self.update_button.configure(state="normal")
+                    messagebox.showerror("更新をダウンロードできません", text)
                 elif kind == "periodic_stopped":
                     self.status.set(text)
                     self.start_button.configure(state="normal")
@@ -417,6 +513,63 @@ class SyncApp:
             Notification(app_id=APP_NAME, title=title, msg=message).show()
         except Exception:
             logger.exception("Windows通知の表示に失敗")
+
+    def check_for_updates(self, manual=False):
+        if self.update_check_thread and self.update_check_thread.is_alive():
+            return
+        if manual:
+            self.update_button.configure(state="disabled")
+            self.status.set("アプリの更新を確認しています...")
+        self.update_check_thread = threading.Thread(target=self.update_check_worker, args=(manual,), daemon=True)
+        self.update_check_thread.start()
+
+    def update_check_worker(self, manual):
+        try:
+            release, asset = fetch_latest_release()
+            latest = release.get("tag_name", "")
+            available = version_key(latest) > version_key(APP_VERSION)
+            result = {
+                "available": available,
+                "manual": manual,
+                "latest": latest,
+                "release_url": release.get("html_url", ""),
+                "download_url": asset.get("browser_download_url", ""),
+                "digest": asset.get("digest", ""),
+                "asset": asset,
+            }
+            self.events.put(("update_check_done", json.dumps(result)))
+            if not available:
+                logger.info("アプリは最新です: local=%s, latest=%s", APP_VERSION, latest)
+        except Exception as exc:
+            logger.exception("アプリの更新確認に失敗")
+            msg = f"manual:{exc}" if manual else str(exc)
+            self.events.put(("update_error", msg))
+
+    def offer_update(self, result):
+        if not result.get("download_url"):
+            messagebox.showerror("更新を確認できません", "Releaseにインストーラーがありません。")
+            return
+        answer = messagebox.askyesno(
+            "アプリの更新があります",
+            f"新しいバージョン v{result['latest']} が利用できます。\n"
+            f"現在のバージョン: v{APP_VERSION}\n\n"
+            "公式Releaseからインストーラーをダウンロードして起動しますか？\n"
+            "続行すると、インストーラーを開始するためアプリを終了します。\n"
+            "Releaseページ: " + result.get("release_url", ""),
+        )
+        if answer:
+            self.update_button.configure(state="disabled")
+            self.status.set("公式インストーラーをダウンロードしています...")
+            thread = threading.Thread(target=self.update_download_worker, args=(result,), daemon=True)
+            thread.start()
+
+    def update_download_worker(self, result):
+        try:
+            path = download_installer(result["asset"], result["latest"])
+            self.events.put(("update_downloaded", str(path)))
+        except Exception as exc:
+            logger.exception("アップデーターのダウンロードに失敗")
+            self.events.put(("update_download_error", str(exc)))
 
     def close(self):
         self.stop_event.set()
