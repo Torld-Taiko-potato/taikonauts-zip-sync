@@ -25,6 +25,13 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
+      - name: Set application version from release tag
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '0.0.0-test' }
+          Set-Content -Path app_version.py -Value ('APP_VERSION = ' + '"' + $version + '"') -Encoding utf8
+
       - name: Build standalone Windows application
         shell: pwsh
         run: pyinstaller --noconfirm --clean --onefile --windowed --name TaikoNautsZipSync --icon assets/taikonauts_sync.ico --add-data "assets/taikonauts_sync.ico;assets" --collect-all pystray --collect-all PIL --collect-all winotify --hidden-import pystray._win32 taiko_zip_sync.py
