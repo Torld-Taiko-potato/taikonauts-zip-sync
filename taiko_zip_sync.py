@@ -20,6 +20,10 @@ try:
 except ImportError:
     pystray = None
     Image = ImageDraw = None
+try:
+    from winotify import Notification
+except ImportError:
+    Notification = None
 
 APP_NAME = "TaikoNauts ZIP Sync"
 API_ROOT = "https://api.github.com"
@@ -222,6 +226,8 @@ class SyncApp:
             tree = json.loads(raw)
             if tree.get("truncated"):
                 raise RuntimeError("リポジトリが大きく、ZIP一覧を取得できませんでした。ZIPを専用フォルダにまとめてください。")
+            notice_path = f"{zip_folder.strip('/')}/announcement.json" if zip_folder.strip("/") else "announcement.json"
+            notice_item = next((item for item in tree.get("tree", []) if item.get("type") == "blob" and item.get("path") == notice_path), None)
             files = [item for item in tree.get("tree", []) if item.get("type") == "blob" and item.get("path", "").lower().endswith(".zip")]
             def_files = [item for item in tree.get("tree", []) if item.get("type") == "blob" and Path(item.get("path", "")).name.lower() in ("category.def", "box.def")]
             prefix = zip_folder.rstrip("/") + "/" if zip_folder else ""
@@ -305,6 +311,23 @@ class SyncApp:
                 except Exception as exc:
                     logger.exception("定義ファイル同期失敗: %s", rel)
                     self.events.put(("error", f"定義ファイルを同期できませんでした: {rel}\n{exc}\n詳細: {LOG_PATH}"))
+            if notice_item:
+                try:
+                    notice_raw, _ = github_request(f"{base}/git/blobs/{notice_item['sha']}", token)
+                    notice_data = json.loads(notice_raw)
+                    import base64
+                    notice = json.loads(base64.b64decode(notice_data["content"]).decode("utf-8"))
+                    notice_id = str(notice.get("id", "")).strip()
+                    title = str(notice.get("title", "")).strip()[:100]
+                    message = str(notice.get("message", "")).strip()[:1000]
+                    if notice_id and title and message and state.get("_announcement_id") != notice_id:
+                        state["_announcement_id"] = notice_id
+                        self.save_state(state)
+                        self.events.put(("notice", json.dumps({"title": title, "message": message}, ensure_ascii=False)))
+                        logger.info("新しいお知らせを受信: %s", notice_id)
+                except Exception as exc:
+                    logger.exception("お知らせの読み込みに失敗")
+                    self.events.put(("error", f"お知らせを読み込めませんでした: {exc}\n詳細: {LOG_PATH}"))
             self.events.put(("status", f"同期確認完了。新規・更新ZIP: {count}件 / ZIP合計: {len(files)}件"))
             logger.info("同期確認完了: %s/%s, 更新ZIP %s/%s", owner, repo, count, len(files))
         except urllib.error.HTTPError as exc:
@@ -375,6 +398,9 @@ class SyncApp:
                     self.log.insert("end", text + "\n")
                     self.log.see("end")
                     self.log.configure(state="disabled")
+                elif kind == "notice":
+                    notice = json.loads(text)
+                    self.show_notice(notice["title"], notice["message"])
                 elif kind == "periodic_stopped":
                     self.status.set(text)
                     self.start_button.configure(state="normal")
@@ -382,6 +408,15 @@ class SyncApp:
         except queue.Empty:
             pass
         self.root.after(150, self.process_events)
+
+    def show_notice(self, title, message):
+        if Notification is None:
+            logger.warning("Windows通知ライブラリwinotifyが利用できません")
+            return
+        try:
+            Notification(app_id=APP_NAME, title=title, msg=message).show()
+        except Exception:
+            logger.exception("Windows通知の表示に失敗")
 
     def close(self):
         self.stop_event.set()

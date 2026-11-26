@@ -16,6 +16,8 @@
 - `assets/taikonauts_sync.ico`: EXE、インストーラー、タスクトレイで共用するWindowsアイコン
 - `assets/taikonauts_sync.png`: READMEに表示するアイコン画像の高解像度版
 
+Windows通知は `winotify` を使います。通知内容は譜面リポジトリの `charts/announcement.json` に置かれ、利用者アプリが同期確認時に新しいIDを検出したときだけ表示します。お知らせの作成・公開は別配布の管理者用ツールで行います。
+
 ## アプリ用リポジトリを作る
 
 譜面リポジトリとは分けて、GitHubにPublicリポジトリを作ります。例: `taikonauts-zip-sync`。
