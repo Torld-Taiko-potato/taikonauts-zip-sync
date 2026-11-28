@@ -2,6 +2,12 @@ name: Build Windows installer
 
 'on':
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Application version for manual builds'
+        required: true
+        default: '0.0.0-test'
+        type: string
   release:
     types: [published]
 
@@ -29,7 +35,7 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
-          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '0.0.0-test' }
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '${{ inputs.version }}' }
           Set-Content -Path app_version.py -Value ('APP_VERSION = ' + '"' + $version + '"') -Encoding utf8
 
       - name: Build standalone Windows application
@@ -43,8 +49,8 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
-          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '0.0.0-test' }
-          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '${{ inputs.version }}' }
+          $iscc = Join-Path (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6') 'ISCC.exe'
           & $iscc "/DAppVersion=$version" installer.iss
 
       - name: Create legacy installer alias
