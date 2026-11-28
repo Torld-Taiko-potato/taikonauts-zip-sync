@@ -28,7 +28,7 @@ try:
 except ImportError:
     Notification = None
 
-APP_NAME = "TaikoNauts ZIP Sync"
+APP_NAME = "TJA譜面同期"
 API_ROOT = "https://api.github.com"
 UPDATE_REPO = "Torld-Taiko-potato/taikonauts-zip-sync"
 INSTALLER_ASSET = "TaikoNautsZipSync-Setup.exe"
@@ -54,7 +54,7 @@ def github_request(url, token):
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "TaikoNauts-ZIP-Sync/1.0",
+        "User-Agent": "TJA-Chart-Sync/1.0",
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -75,7 +75,7 @@ def version_key(value):
 
 def fetch_latest_release():
     url = f"{API_ROOT}/repos/{UPDATE_REPO}/releases/latest"
-    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "TaikoNauts-ZIP-Sync/1.0"})
+    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "TJA-Chart-Sync/1.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         release = json.loads(response.read().decode("utf-8"))
     asset = next((item for item in release.get("assets", []) if item.get("name") == INSTALLER_ASSET), None)
@@ -88,16 +88,16 @@ def download_installer(asset, tag_name):
     url = asset["browser_download_url"]
     expected_prefix = f"https://github.com/{UPDATE_REPO}/releases/download/"
     if not url.startswith(expected_prefix):
-        raise ValueError("インストーラーのダウンロード先が公式Release URLではありません。")
+        raise ValueError("インストーラーのダウンロード先がGitHub ReleaseのURLではありません。")
     expected_digest = asset.get("digest") or ""
     if not expected_digest.startswith("sha256:"):
         raise ValueError("GitHub ReleaseにSHA-256情報がないため、安全のため更新を中止しました。")
     downloads = Path.home() / "Downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     safe_tag = re.sub(r"[^A-Za-z0-9._-]", "_", tag_name)
-    target = downloads / f"TaikoNautsZipSync-Setup-{safe_tag}.exe"
+    target = downloads / f"TJA-Chart-Sync-Setup-{safe_tag}.exe"
     temporary = target.with_suffix(target.suffix + ".download")
-    request = urllib.request.Request(url, headers={"User-Agent": "TaikoNauts-ZIP-Sync/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "TJA-Chart-Sync/1.0"})
     digest = hashlib.sha256()
     total = 0
     try:
@@ -205,7 +205,7 @@ class SyncApp:
     def make_ui(self):
         main = ttk.Frame(self.root, padding=16)
         main.pack(fill="both", expand=True)
-        ttk.Label(main, text="GitHub ZIP同期", font=("Segoe UI", 17, "bold")).pack(anchor="w")
+        ttk.Label(main, text="TJA譜面同期", font=("Segoe UI", 17, "bold")).pack(anchor="w")
         ttk.Label(main, text="リポジトリ内のZIPを定期確認し、新規・更新分を保存先へ展開します。既存の譜面は自動削除しません。", wraplength=700).pack(anchor="w", pady=(4, 14))
 
         form = ttk.Frame(main)
@@ -216,7 +216,7 @@ class SyncApp:
         self.add_entry(form, "ZIPを探すフォルダ（空欄ならリポジトリ全体）", tk.StringVar(value=self.config.get("zip_folder") or "charts"), 3, key="zip_folder")
         self.zip_folder_var = self.fields["zip_folder"]
         self.add_entry(form, "GitHubトークン（非公開リポジトリ用。実行中のみ保持）", self.token, 4, show="*")
-        self.add_entry(form, "TaikoNautsの譜面保存先", self.folder, 5, browse=True)
+        self.add_entry(form, "譜面の保存先", self.folder, 5, browse=True)
         self.add_entry(form, "確認間隔（分）", self.interval, 6)
         ttk.Label(main, text="ZIPの置き方: リポジトリ（または指定フォルダ）に曲ごとの .zip を追加してください。ZIP内に .tja と対応する .ogg を入れ、必要なら曲フォルダごとZIP化します。", wraplength=700).pack(anchor="w", pady=(12, 4))
         ttk.Label(main, text="初回同期も実行します。更新ZIPは同名フォルダへ展開し、差し替えファイルのみ上書きされます。ZIPを削除してもプレイヤー側の譜面は消えません。", wraplength=700).pack(anchor="w", pady=4)
@@ -250,7 +250,7 @@ class SyncApp:
             self.fields[key] = variable
 
     def choose_folder(self):
-        path = filedialog.askdirectory(title="TaikoNautsの譜面保存先を選択")
+        path = filedialog.askdirectory(title="譜面フォルダを選択")
         if path:
             self.folder.set(path)
 
@@ -260,7 +260,7 @@ class SyncApp:
         if not owner or not repo or not branch:
             raise ValueError("GitHubユーザー/組織、リポジトリ名、ブランチを入力してください。")
         if not dest:
-            raise ValueError("TaikoNautsの譜面保存先を選択してください。")
+            raise ValueError("譜面の保存先を選択してください。")
         try:
             minutes = int(self.interval.get())
             if minutes < 1:
@@ -553,13 +553,13 @@ class SyncApp:
             "アプリの更新があります",
             f"新しいバージョン v{result['latest']} が利用できます。\n"
             f"現在のバージョン: v{APP_VERSION}\n\n"
-            "公式Releaseからインストーラーをダウンロードして起動しますか？\n"
+            "このアプリのGitHub Releaseからインストーラーをダウンロードして起動しますか？\n"
             "続行すると、インストーラーを開始するためアプリを終了します。\n"
             "Releaseページ: " + result.get("release_url", ""),
         )
         if answer:
             self.update_button.configure(state="disabled")
-            self.status.set("公式インストーラーをダウンロードしています...")
+            self.status.set("GitHub Releaseのインストーラーをダウンロードしています...")
             thread = threading.Thread(target=self.update_download_worker, args=(result,), daemon=True)
             thread.start()
 
