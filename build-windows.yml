@@ -1,0 +1,73 @@
+name: Build Windows installer
+
+'on':
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Set application version from release tag
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '0.0.0-test' }
+          Set-Content -Path app_version.py -Value ('APP_VERSION = ' + '"' + $version + '"') -Encoding utf8
+
+      - name: Build standalone Windows application
+        shell: pwsh
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name TaikoNautsZipSync --icon assets/taikonauts_sync.ico --add-data "assets/taikonauts_sync.ico;assets" --collect-all pystray --collect-all PIL --collect-all winotify --hidden-import pystray._win32 taiko_zip_sync.py
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $version = '0.0.0-test' }
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc "/DAppVersion=$version" installer.iss
+
+      - name: Create legacy installer alias
+        shell: pwsh
+        run: Copy-Item -LiteralPath dist-installer/TJA-Chart-Sync-Setup.exe -Destination dist-installer/TaikoNautsZipSync-Setup.exe
+
+      - name: Save installer as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TJA-Chart-Sync-Setup
+          path: |
+            dist-installer/TJA-Chart-Sync-Setup.exe
+            dist-installer/TaikoNautsZipSync-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach installer to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-installer/TJA-Chart-Sync-Setup.exe
+            dist-installer/TaikoNautsZipSync-Setup.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

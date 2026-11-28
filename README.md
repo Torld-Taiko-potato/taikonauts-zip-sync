@@ -9,11 +9,11 @@ GitHub上の共有リポジトリからTJA形式の譜面データを取得し�
 ## ダウンロードとインストール
 
 1. このアプリのGitHubリポジトリで **Releases** を開き、最新リリースを選びます。
-2. 添付されている `TaikoNautsZipSync-Setup.exe` をダウンロードして実行します。
+2. 添付されている `TJA-Chart-Sync-Setup.exe` をダウンロードして実行します。
 3. 画面の案内に従ってインストールします。Pythonや追加ライブラリは不要です。
 4. インストール完了後にアプリを起動します。
 
-Releaseのインストーラー名は、既存バージョンのアプリ内アップデートとの互換性を保つため、当面 `TaikoNautsZipSync-Setup.exe` のままです。コード署名のないアプリのため、Windows SmartScreenが警告する場合があります。必ずこのリポジトリのReleaseから取得したファイルであることを確認してください。
+新しいReleaseでは、既存バージョンからの更新互換性のため `TaikoNautsZipSync-Setup.exe` も同じインストーラーの旧名として添付します。通常は新しい `TJA-Chart-Sync-Setup.exe` を選んでください。コード署名のないアプリのため、Windows SmartScreenが警告する場合があります。必ずこのリポジトリのReleaseから取得したファイルであることを確認してください。
 
 ## 初回設定
 

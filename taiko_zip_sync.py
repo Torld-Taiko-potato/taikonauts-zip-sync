@@ -30,8 +30,11 @@ except ImportError:
 
 APP_NAME = "TJA譜面同期"
 API_ROOT = "https://api.github.com"
-UPDATE_REPO = "Torld-Taiko-potato/taikonauts-zip-sync"
-INSTALLER_ASSET = "TaikoNautsZipSync-Setup.exe"
+UPDATE_REPOS = (
+    "Torld-Taiko-potato/taikonauts-zip-sync",
+    "Torld-Taiko-potato/tja-chart-sync",
+)
+INSTALLER_ASSETS = ("TJA-Chart-Sync-Setup.exe", "TaikoNautsZipSync-Setup.exe")
 try:
     from app_version import APP_VERSION
 except ImportError:
@@ -74,20 +77,30 @@ def version_key(value):
 
 
 def fetch_latest_release():
-    url = f"{API_ROOT}/repos/{UPDATE_REPO}/releases/latest"
-    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "TJA-Chart-Sync/1.0"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        release = json.loads(response.read().decode("utf-8"))
-    asset = next((item for item in release.get("assets", []) if item.get("name") == INSTALLER_ASSET), None)
-    if not asset or not asset.get("browser_download_url"):
-        raise RuntimeError(f"最新Releaseに {INSTALLER_ASSET} が見つかりません。")
-    return release, asset
+    last_error = None
+    for repository in UPDATE_REPOS:
+        url = f"{API_ROOT}/repos/{repository}/releases/latest"
+        request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "TJA-Chart-Sync/1.0"})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                release = json.loads(response.read().decode("utf-8"))
+        except urllib.error.URLError as exc:
+            last_error = exc
+            continue
+        for expected_name in INSTALLER_ASSETS:
+            asset = next((item for item in release.get("assets", []) if item.get("name") == expected_name), None)
+            if asset and asset.get("browser_download_url"):
+                return release, asset
+        last_error = RuntimeError("最新Releaseに対応するインストーラーがありません: " + ", ".join(INSTALLER_ASSETS))
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("GitHubリポジトリからLatest Releaseを取得できません。")
 
 
 def download_installer(asset, tag_name):
     url = asset["browser_download_url"]
-    expected_prefix = f"https://github.com/{UPDATE_REPO}/releases/download/"
-    if not url.startswith(expected_prefix):
+    expected_prefixes = tuple(f"https://github.com/{repository}/releases/download/" for repository in UPDATE_REPOS)
+    if not any(url.startswith(prefix) for prefix in expected_prefixes):
         raise ValueError("インストーラーのダウンロード先がGitHub ReleaseのURLではありません。")
     expected_digest = asset.get("digest") or ""
     if not expected_digest.startswith("sha256:"):

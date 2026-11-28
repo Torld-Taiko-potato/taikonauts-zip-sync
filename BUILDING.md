@@ -4,7 +4,7 @@
 
 ## リポジトリの役割
 
-このアプリ用のGitHubリポジトリ名は、既存のアプリ内アップデート先を維持するため `taikonauts-zip-sync` のままです。譜面ZIPは別の公開リポジトリ `Torld-Taiko-potato/taiko-charts` から取得します。アプリの表示名は **TJA譜面同期** です。
+この互換移行中、アプリ用リポジトリは `taikonauts-zip-sync` です。互換ブリッジ版の公開後に `tja-chart-sync` へ改名する予定です。譜面ZIPは別の公開リポジトリ `Torld-Taiko-potato/taiko-charts` から取得します。アプリの表示名は **TJA譜面同期** です。
 
 必要な主なファイルは次のとおりです。
 
@@ -21,7 +21,7 @@ Windows通知は `winotify` を使います。通知内容は譜面リポジト�
 
 ## アプリ用リポジトリを作る
 
-譜面リポジトリとは分けて、GitHubにPublicリポジトリを作ります。既存リポジトリは `taikonauts-zip-sync` です。自動更新との互換性があるため、GitHub上のリポジトリ名は変更しません。
+譜面リポジトリとは分けて、GitHubにPublicリポジトリを作ります。現在のリポジトリは `taikonauts-zip-sync` で、互換ブリッジ版を公開してから `tja-chart-sync` に改名します。アプリの更新確認コードは旧・新どちらのURLも扱います。
 
 プロジェクトのファイルをフォルダ階層を保ったままアップロードしてコミットします。`app_version.py` も含めてください。ワークフローは必ず `.github/workflows/build-windows.yml` に置きます。`.github` がWebアップロード画面に表示されない場合は、GitHubの **Add file → Create new file** からファイル名に `.github/workflows/build-windows.yml` と入力し、ファイル内容を貼り付けてください。
 
@@ -31,15 +31,15 @@ Windows通知は `winotify` を使います。通知内容は譜面リポジト�
 2. **Choose a tag** に `v1.0.2` のような新しいタグを入力し、新規タグとして作成します。Targetは `main` にします。
 3. Release titleに **TJA譜面同期 v1.0.2** のような名前を入力します。
 4. **Publish release** を押します。
-5. **Actions** タブで **Build Windows installer** が実行されていることを確認します。完了後、Releaseページに `TaikoNautsZipSync-Setup.exe` が添付されます。
+5. **Actions** タブで **Build Windows installer** が実行されていることを確認します。完了後、Releaseページに `TJA-Chart-Sync-Setup.exe` と旧版互換用の `TaikoNautsZipSync-Setup.exe` が添付されます。
 
-Releaseの添付ファイル名は、すでに配布されているアプリがこの名前を検索して更新するため、当面変更しないでください。Innoの `AppId` と `DefaultDirName` も既存利用者の更新のため維持します。インストーラー内の製品名とショートカット名は **TJA譜面同期** に変更されています。
+旧版アプリとの互換性のため、Releaseには旧ファイル名のエイリアスも残します。Innoの `AppId`、`DefaultDirName`、インストール済みアプリ実行ファイル名は既存利用者の更新のため維持します。インストーラー内の製品名とショートカット名は **TJA譜面同期** です。
 
 GitHub ActionsはGitHubのWindowsランナー上でビルドします。開発者のPCにPythonをインストールしなくてもRelease用インストーラーを生成できます。初回はInno Setupの準備に時間がかかる場合があります。
 
 ## ビルドだけを試す
 
-**Actions → Build Windows installer → Run workflow** を実行します。成功後、実行結果の **Artifacts** から `TJA-Chart-Sync-Setup` をダウンロードできます。これは動作確認用です。利用者へ配る場合はReleaseを作成してください。
+**Actions → Build Windows installer → Run workflow** を実行します。成功後、実行結果の **Artifacts** から `TJA-Chart-Sync-Setup` をダウンロードできます。Artifactには新旧両方のEXE名が入ります。これは動作確認用です。利用者へ配る場合はReleaseを作成してください。
 
 ## アプリの更新
 
