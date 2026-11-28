@@ -50,7 +50,7 @@ jobs:
       - name: Save installer as workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: TaikoNautsZipSync-Setup
+          name: TJA-Chart-Sync-Setup
           path: dist-installer/TaikoNautsZipSync-Setup.exe
           if-no-files-found: error
           retention-days: 30
